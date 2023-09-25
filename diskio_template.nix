@@ -29,6 +29,16 @@
                 content = {
                   type = "zfs";
                   pool = "zroot";
+                  options = {
+                    ashift = 12; # Adjust for your drive's sector size
+                    compression = "lz4";
+                    atime = "off";
+                    primarycache = "all";
+                    secondarycache = "all";
+                    recordsize = "128K";
+                    logbias = "throughput";
+                    sync = "disabled";
+                  };
                 };
               };
               docker = {
@@ -36,6 +46,9 @@
                 content = {
                   type = "zfs";
                   pool = "docker";
+                  options = {
+                    # Add dataset-specific options here if needed
+                  };
                 };
               };
               log = {
@@ -43,6 +56,9 @@
                 content = {
                   type = "zfs";
                   pool = "log";
+                  options = {
+                    # Add dataset-specific options here if needed
+                  };
                 };
               };
             };
@@ -54,21 +70,7 @@
     zpool = {
       zroot = {
         type = "zpool";
-        mode = "striped"; # Change this to "striped" from "mirrored" for RAID 0
-        datasets = {
-          root = {
-            type = "zfs_fs";
-            mountpoint = "/";
-          };
-          docker = {
-            type = "zfs_fs";
-            mountpoint = "/var/lib/docker";
-          };
-          log = {
-            type = "zfs_fs";
-            mountpoint = "/var/log";
-          };
-        };
+        mode = "striped"; # Change this to "striped" for RAID 0
       };
     };
   };
