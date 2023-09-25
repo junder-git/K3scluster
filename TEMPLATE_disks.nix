@@ -1,66 +1,79 @@
-# Define the target for the NixOS installation
+# Import the NixOS modules we need
 { config, lib, ... }:
 
 {
-  # Set the hostname of your Raspberry Pi
-  networking.hostName = "my-pi";
+  # Define the partition sizes
+  bootSize = "512MiB";
+  rootSize = "5GB";
+  dockerSize = "20GB";
+  logSize = "3GB";
 
-  # Specify the boot device (SD card)
-  boot.loader.grub.device = "/dev/mmcblk0";
+  # Define the partition mount points
+  bootMount = "/boot";
+  rootMount = "/";
+  dockerMount = "/var/lib/docker";
+  logMount = "/var/log";
 
-  # Define the partitions on the SD card
-  boot.initrd.luks.devices = [
-    {
-      name = "root";
-      device = "/dev/sda2"; # Adjust this according to your setup
-      preLVM = true;
-    }
-  ];
-
-  # Create a ZFS pool on the USB drive
-  storage.zfs.poolNames = [ "mypool" ];
-  storage.zfs.autoScrub = true; # Enable automatic ZFS scrubbing
-
-  # Define datasets on the ZFS pool
-  storage.zfs.datasets = {
-    root = {
-      quota = "5G"; # Adjust the size as needed
-      mountpoint = "/"; # Root filesystem
-    };
-    varlibdocker = {
-      quota = "20G"; # Adjust the size as needed
-      mountpoint = "/var/lib/docker";
-    };
-    varlog = {
-      quota = "3G"; # Adjust the size as needed
-      mountpoint = "/var/log";
-    };
-  };
-
-  # Set up RAID (mirror) for /var/lib/rancher (if possible)
-  storage.mdadm.devices = [
-    { 
-      name = "my-raid";
-      devices = [ "/dev/sda3", "/dev/sdb3" ]; # Adjust device paths
-      raidLevel = "1"; # RAID 1 (mirror)
-    }
-  ];
-
-  # Define the file systems for /boot and /var/lib/rancher
-  fileSystems."/boot" = {
-    device = "/dev/mmcblk0p1"; # Adjust this according to your setup
+  # Define the EFI system partition
+  efiSystemPartition = {
+    device = "/dev/disk/by-partlabel/efi";
+    size = bootSize;
     fsType = "ext4";
   };
-  fileSystems."/var/lib/rancher" = {
-    device = "/dev/md0"; # Use the RAID device
-    fsType = "ext4"; # Adjust as needed
+
+  # Define the root partition
+  rootPartition = {
+    device = "/dev/disk/by-partlabel/root";
+    size = rootSize;
+    fsType = "zfs";
   };
 
-  # Set up the network configuration
-  networking.interfaces.eth0.useDHCP = true; # Use DHCP for Ethernet
+  # Define the Docker partition
+  dockerPartition = {
+    device = "/dev/disk/by-partlabel/docker";
+    size = dockerSize;
+    fsType = "zfs";
+  };
 
-  # Additional configuration for Rancher (if needed)
-  # Add your Rancher-specific settings here
+  # Define the log partition
+  logPartition = {
+    device = "/dev/disk/by-partlabel/log";
+    size = logSize;
+    fsType = "zfs";
+  };
 
-  # Add any other necessary configuration options here
+  # Define the file systems for the partitions
+  fileSystems = [
+    efiSystemPartition
+    rootPartition
+    dockerPartition
+    logPartition
+  ];
+
+  # Define the bootloader configuration
+  boot.loader = {
+    efiSupport = true;
+    grub.enable = true;
+    grub.efiInstallAsRemovable = true;
+    grub.devices = [ "/dev/sda" ]; # Specify your EFI disk here
+  };
+
+  # Define the ZFS configuration
+  boot.supportedFilesystems = [ "zfs" ];
+
+  fileSystems."/".fsType = "zfs";
+  fileSystems."/var/lib/docker".fsType = "zfs";
+  fileSystems."/var/log".fsType = "zfs";
+
+  services.openssh.enable = true; # Enable SSH access
+
+  # Add any other system configurations as needed
+
+  # Add the partitions to the configuration
+  hardware = {
+    partitioning = {
+      scheme = "gpt";
+      partitions = fileSystems;
+    };
+  };
 }
